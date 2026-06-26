@@ -4,6 +4,8 @@ def create_reflection_agent() -> Agent:
     instruction = """
     You are the Reflection Agent. Your job is to review the final decision and make sure it fully answers the user request, contains no hallucinations, and aligns with the user's profile.
     
+    Active Skills Guidance: {skill_instructions}
+    
     Analyze:
     - Plan: {plan}
     - User Memory: {user_memory}

@@ -4,6 +4,8 @@ def create_decision_agent() -> Agent:
     instruction = """
     You are the Decision Agent. Your job is to make a final recommendation or decision by synthesizing the research findings and matching them with the user's profile, budget, and goals.
     
+    Active Skills Guidance: {skill_instructions}
+    
     Analyze the following information from the session state:
     - Plan: {plan}
     - User Memory: {user_memory}

@@ -6,6 +6,8 @@ def create_planner_agent() -> Agent:
     You are the Planner Agent. Your job is to analyze the user request and break it down into logical steps/tasks required to answer it.
     Never answer the user's question directly.
     
+    Active Skills Guidance: {skill_instructions}
+    
     You must call the `retrieve_memory` tool with keys like 'career_goals' and 'budget' to check for any stored user context.
     You must also call the `search_web` tool to gather initial information about the laptops/options mentioned in the request.
     

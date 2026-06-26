@@ -4,6 +4,7 @@ import asyncio
 from dotenv import load_dotenv
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
+from google.adk.apps import App
 from google.genai import types
 from google.genai.errors import APIError, ServerError
 
@@ -11,10 +12,13 @@ from google.genai.errors import APIError, ServerError
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-# Import the root orchestrator agent
+# Import custom memory initialization, skills loader, and guardrails plugin
+from memory import init_db
+from skills import match_and_load_skills
+from agents.guardrails import GuardrailsPlugin, SecurityViolation
 from agents.agent import root_agent
 
-async def run_pipeline_with_retry(max_retries=5, delay_seconds=4):
+async def run_pipeline_with_retry(query: str = None, max_retries: int = 5, delay_seconds: int = 4):
     # Load environment variables
     load_dotenv()
     
@@ -26,10 +30,15 @@ async def run_pipeline_with_retry(max_retries=5, delay_seconds=4):
         
     print("[+] Initializing Multi-Agent System (Sequential Orchestrator)...")
     
+    # Initialize SQLite database schema
+    init_db()
+    
     user_id = "user_123"
     session_id = "session_456"
     
-    query = "Should I buy a MacBook Air or Lenovo LOQ for AI development?"
+    if not query:
+        query = "Should I buy a MacBook Air or Lenovo LOQ for AI development?"
+        
     print(f"\n[+] User Request: {query}")
     print("[+] Executing workflow: Planner -> Memory -> Research -> Decision -> Reflection\n")
     
@@ -38,14 +47,38 @@ async def run_pipeline_with_retry(max_retries=5, delay_seconds=4):
         parts=[types.Part.from_text(text=query)]
     )
     
+    # Identify and load dynamic domain-specific skills matching the query
+    matched_skills = match_and_load_skills(query)
+    if matched_skills:
+        print(f"[+] Loaded matching skills: {[s.name for s in matched_skills]}")
+        skill_instructions = "\n\n".join([
+            f"--- Active Domain Skill: {s.name} ---\n{s.instructions}"
+            for s in matched_skills
+        ])
+    else:
+        print("[+] No specific domain skills matched for this request.")
+        skill_instructions = "No specific domain skills active."
+        
     for attempt in range(1, max_retries + 1):
         try:
-            # Configure the session service (we recreate it to have a fresh state per clean run)
+            # Configure the session service
             session_service = InMemorySessionService()
-            await session_service.create_session(app_name="agents", user_id=user_id, session_id=session_id)
+            session = await session_service.create_session(
+                app_name="agents",
+                user_id=user_id,
+                session_id=session_id,
+                state={"skill_instructions": skill_instructions}
+            )
             
-            # Initialize the Runner with our orchestrator agent
-            runner = Runner(agent=root_agent, app_name="agents", session_service=session_service)
+            # Initialize App with GuardrailsPlugin
+            app = App(
+                name="agents",
+                root_agent=root_agent,
+                plugins=[GuardrailsPlugin()]
+            )
+            
+            # Initialize the Runner with the configured App
+            runner = Runner(app=app, session_service=session_service)
             
             # Execute the agents sequentially and stream/capture the events
             async for event in runner.run_async(
@@ -54,7 +87,6 @@ async def run_pipeline_with_retry(max_retries=5, delay_seconds=4):
                 new_message=new_message
             ):
                 author = event.author
-                # Print transitions and updates from each agent
                 if event.content and event.content.parts:
                     text = event.content.parts[0].text
                     if text:
@@ -72,11 +104,15 @@ async def run_pipeline_with_retry(max_retries=5, delay_seconds=4):
             return
             
         except Exception as e:
+            # Check for direct or wrapped SecurityViolation from prompt injection
+            if isinstance(e, SecurityViolation) or (isinstance(e, RuntimeError) and "Prompt injection" in str(e)):
+                print("\n[-] Blocked by Guardrails: Access Denied: Prompt injection attempt detected.")
+                sys.exit(0)
+                
             error_str = str(e)
             if any(term in error_str for term in ["503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "LimitExceeded", "quota"]):
                 wait_time = 20 if any(t in error_str for t in ["429", "RESOURCE_EXHAUSTED", "quota"]) else delay_seconds
                 first_line = error_str.splitlines()[0] if error_str.splitlines() else "Unknown Error"
-                # Strip traceback noise from printing if ADK error wrapped
                 clean_err = first_line if "429" not in first_line else "429 Resource Exhausted/Rate Limit"
                 print(f"[!] Transient issue encountered on attempt {attempt}/{max_retries}: {clean_err}")
                 print(f"Waiting {wait_time} seconds before retrying...")
@@ -89,7 +125,9 @@ async def run_pipeline_with_retry(max_retries=5, delay_seconds=4):
                 raise e
 
 def main():
-    asyncio.run(run_pipeline_with_retry())
+    # Allow passing custom test query via command line if needed
+    query = sys.argv[1] if len(sys.argv) > 1 else None
+    asyncio.run(run_pipeline_with_retry(query=query))
 
 if __name__ == "__main__":
     main()

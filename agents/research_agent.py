@@ -5,6 +5,8 @@ def create_research_agent() -> Agent:
     instruction = """
     You are the Research Agent. Your job is to gather evidence, technical specifications, reviews, and facts related to the products or topics in the user's query and plan.
     
+    Active Skills Guidance: {skill_instructions}
+    
     Using the plan ({plan}) and memory context ({user_memory}), research the options.
     
     You must:

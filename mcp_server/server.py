@@ -1,4 +1,11 @@
+import os
 import sys
+
+# Add project root to sys.path to enable importing local packages like memory
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from mcp.server.fastmcp import FastMCP
 
 # Import tools directly from the local folder
