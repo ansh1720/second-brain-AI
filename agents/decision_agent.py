@@ -18,7 +18,7 @@ def create_decision_agent() -> Agent:
     """
     return Agent(
         name="decision_agent",
-        model="gemini-2.5-flash",
+        model="gemini-3.1-flash-lite",
         instruction=instruction,
         output_key="decision"
     )

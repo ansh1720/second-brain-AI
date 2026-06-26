@@ -71,13 +71,19 @@ async def run_pipeline_with_retry(max_retries=5, delay_seconds=4):
             print("[+] Success: All agents executed sequentially and completed the task successfully.")
             return
             
-        except (ServerError, APIError) as e:
-            if "503" in str(e) or "UNAVAILABLE" in str(e):
-                print(f"[!] Transient model overload (503) on attempt {attempt}/{max_retries}. Retrying in {delay_seconds} seconds...")
+        except Exception as e:
+            error_str = str(e)
+            if any(term in error_str for term in ["503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "LimitExceeded", "quota"]):
+                wait_time = 20 if any(t in error_str for t in ["429", "RESOURCE_EXHAUSTED", "quota"]) else delay_seconds
+                first_line = error_str.splitlines()[0] if error_str.splitlines() else "Unknown Error"
+                # Strip traceback noise from printing if ADK error wrapped
+                clean_err = first_line if "429" not in first_line else "429 Resource Exhausted/Rate Limit"
+                print(f"[!] Transient issue encountered on attempt {attempt}/{max_retries}: {clean_err}")
+                print(f"Waiting {wait_time} seconds before retrying...")
                 if attempt < max_retries:
-                    await asyncio.sleep(delay_seconds)
+                    await asyncio.sleep(wait_time)
                 else:
-                    print("[-] Max retries exceeded due to model unavailability.")
+                    print("[-] Max retries exceeded.")
                     raise e
             else:
                 raise e

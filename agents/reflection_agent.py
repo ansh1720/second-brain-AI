@@ -20,7 +20,7 @@ def create_reflection_agent() -> Agent:
     """
     return Agent(
         name="reflection_agent",
-        model="gemini-2.5-flash",
+        model="gemini-3.1-flash-lite",
         instruction=instruction,
         output_key="final_answer"
     )

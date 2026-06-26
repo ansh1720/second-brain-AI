@@ -1,4 +1,5 @@
 from google.adk.agents import Agent
+from agents.mcp_helper import get_mcp_toolset
 
 def create_memory_agent() -> Agent:
     instruction = """
@@ -7,16 +8,23 @@ def create_memory_agent() -> Agent:
     Examine the user request and the plan:
     - Plan: {plan}
     
-    Simulate memory retrieval. If the user's query is about buying a laptop, career guidance, or dev environments, provide simulated preferences that match:
-    - Career goals: Becoming an AI Engineer / AI Developer.
-    - Budget: ₹70,000 INR (approx. $900 USD).
-    - Preferred Brand: Open to any brand (Lenovo, Apple, etc.), but prefers value-for-money.
+    First, use the `retrieve_memory` tool to check if the following keys exist in memory:
+    1. 'career_goals'
+    2. 'budget'
+    3. 'preferred_brand'
     
-    Output a summary of these retrieved memories.
+    If they are missing or empty:
+    Use the `save_memory` tool to save default preferences:
+    - Save 'career_goals' as 'AI Engineer'
+    - Save 'budget' as '70000 INR'
+    - Save 'preferred_brand' as 'Lenovo or Apple (based on options)'
+    
+    Output a summary of these retrieved and saved memories.
     """
     return Agent(
         name="memory_agent",
-        model="gemini-2.5-flash",
+        model="gemini-3.1-flash-lite",
         instruction=instruction,
+        tools=[get_mcp_toolset()],
         output_key="user_memory"
     )

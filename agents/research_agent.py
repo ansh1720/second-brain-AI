@@ -1,20 +1,24 @@
 from google.adk.agents import Agent
+from agents.mcp_helper import get_mcp_toolset
 
 def create_research_agent() -> Agent:
     instruction = """
     You are the Research Agent. Your job is to gather evidence, technical specifications, reviews, and facts related to the products or topics in the user's query and plan.
     
     Using the plan ({plan}) and memory context ({user_memory}), research the options.
-    If the query compares laptops (specifically MacBook Air vs Lenovo LOQ for AI development):
-    - MacBook Air M2/M3: Great build quality, silent fanless design, exceptional battery life (15-18 hours), Unix-based terminal (excellent for dev), but limited RAM in base configurations (usually 8GB/16GB, unified memory is expensive to upgrade) and no dedicated NVIDIA GPU (no native CUDA support, making local model training/heavy inference slower).
-    - Lenovo LOQ: Great raw performance, comes with dedicated NVIDIA RTX 4050/4060 GPUs (full CUDA support for PyTorch/TensorFlow, essential for deep learning/local model execution), upgradeable RAM (up to 32GB easily), but poor battery life (3-5 hours), bulky charger, and plastic chassis. Excellent for local machine learning workloads.
     
-    If the query asks about other topics, research them similarly.
-    Output a detailed summary of your research findings.
+    You must:
+    1. Call the `search_web` tool to search for details, benchmarks, and prices of MacBook Air M2/M3 vs Lenovo LOQ.
+    2. Call the `calculator` tool to perform budget checks or calculations (e.g. calculate price differences).
+    3. Call the `compare_options` tool with a JSON string comparing the laptops. Use this JSON format:
+       {"options": [{"name": "MacBook Air M2", "price": "89,900 INR", "gpu": "Integrated Apple GPU (No CUDA)", "ram": "8GB Unified (soldered)", "battery": "18 hours"}, {"name": "Lenovo LOQ", "price": "70,000 INR", "gpu": "Dedicated NVIDIA RTX 4050 (CUDA)", "ram": "16GB (upgradeable)", "battery": "3-5 hours"}]}
+    
+    Output a detailed summary of your research findings, including the comparison table.
     """
     return Agent(
         name="research_agent",
-        model="gemini-2.5-flash",
+        model="gemini-3.1-flash-lite",
         instruction=instruction,
+        tools=[get_mcp_toolset()],
         output_key="research_results"
     )
