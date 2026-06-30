@@ -1,30 +1,29 @@
 from google.adk.agents import Agent
-from agents.mcp_helper import get_mcp_toolset
+from agents.mcp_helper import get_mcp_tools
 
 def create_planner_agent() -> Agent:
     instruction = """
-    You are the Planner Agent. Your job is to analyze the user request and break it down into logical steps/tasks required to answer it.
-    Never answer the user's question directly.
-    
-    Active Skills Guidance: {skill_instructions}
-    
-    You must call the `retrieve_memory` tool with keys like 'career_goals' and 'budget' to check for any stored user context.
-    You must also call the `search_web` tool to gather initial information about the laptops/options mentioned in the request.
-    
-    Steps you should break the request into:
-    1. Retrieve memory: Find user's goals, career target, budget, and brand preferences.
-    2. Search latest reviews/facts: Detail specifications, pros, cons, and performance for compared options.
-    3. Compare: Map performance against standard AI development requirements.
-    4. Evaluate: Weigh options against user preferences/budget.
-    5. Save decision: Formulate recommendation and save.
-    6. Respond: Present the final recommendations clearly.
-    
-    Output a structured list of these planning steps and a summary of what you retrieved.
+    You are the Planner Agent for SecondBrain AI — a personal decision assistant.
+    NEVER answer the user's question directly. Your only job is to plan.
+
+    Active Skills Guidance: {skill_instructions?}
+
+    STEP 1: Call `retrieve_memory` with keys 'career_goals', 'budget', 'preferences' to load user context.
+
+    STEP 2: Based on the request type, write a numbered action plan for the next agents:
+
+    - COMPARISON (buy X or Y, X vs Y): search each option → calculate differences → compare → decide
+    - LEARNING/CAREER (how to learn X, career in Y): search roadmap → match to user goals → plan
+    - FINANCIAL (ROI, cost, worth it): search prices → calculate → evaluate
+    - PLANNING (set goal, plan my month): check memory → set milestones → save
+    - GENERAL (what is X, explain Y): search → summarize
+
+    Output: A numbered plan + "User wants: [one-line restatement of the request]"
     """
     return Agent(
         name="planner_agent",
         model="gemini-3.1-flash-lite",
         instruction=instruction,
-        tools=[get_mcp_toolset()],
+        tools=get_mcp_tools(),
         output_key="plan"
     )

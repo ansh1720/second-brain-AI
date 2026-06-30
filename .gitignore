@@ -1,6 +1,35 @@
+# Python
 .venv/
-.env
 __pycache__/
-*.db
 *.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
 
+# Environment
+.env
+.env.*
+
+# Database (runtime data)
+*.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated files
+uv.lock
+
+# Runtime artifacts
+artifacts/
+memory/memory_bank.json
+
+# Local agent config
+.agents/

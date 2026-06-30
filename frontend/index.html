@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SecondBrain AI — Personal Decision Assistant</title>
+<meta name="description" content="SecondBrain AI is a memory-aware, tool-using, multi-agent decision assistant that helps you make better choices over time.">
+<meta name="keywords" content="AI, decision assistant, multi-agent, Gemini, second brain, personal assistant">
+<meta name="author" content="Ansh">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0c15;
+    --surface: #111425;
+    --surface2: #181c33;
+    --surface3: #1e2340;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.12);
+    --accent: #7c5cfc;
+    --accent-soft: rgba(124,92,252,0.12);
+    --accent2: #00d4ff;
+    --accent2-soft: rgba(0,212,255,0.08);
+    --green: #22c55e;
+    --green-soft: rgba(34,197,94,0.12);
+    --red: #ef4444;
+    --red-soft: rgba(239,68,68,0.1);
+    --yellow: #f59e0b;
+    --text: #e8eaf0;
+    --text-secondary: #9ca3af;
+    --muted: #6b7280;
+    --user-bubble: #1a1f3d;
+    --ai-bubble: #111528;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg); color: var(--text);
+    height: 100vh; display: flex; overflow: hidden;
+  }
+
+  /* ── Sidebar ────────────────────────────────────────────── */
+  .sidebar {
+    width: 272px; background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 20px 14px; flex-shrink: 0;
+    transition: transform 0.3s ease;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-bottom: 24px; }
+  .logo-icon {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+    box-shadow: 0 4px 16px rgba(124,92,252,0.3);
+  }
+  .logo-text { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+  .logo-sub { font-size: 11px; color: var(--muted); font-weight: 400; margin-top: 1px; }
+
+  .new-chat-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: linear-gradient(135deg, var(--accent), #5b3fd4);
+    border: none; color: white; padding: 11px 16px; border-radius: 12px;
+    cursor: pointer; font-size: 13px; font-weight: 600; width: 100%;
+    margin-bottom: 24px; transition: all 0.2s;
+    box-shadow: 0 2px 12px rgba(124,92,252,0.25);
+  }
+  .new-chat-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(124,92,252,0.4); }
+
+  .sidebar-label {
+    font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; padding: 0 10px; margin-bottom: 8px;
+  }
+  .history-item {
+    padding: 9px 12px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; color: var(--text-secondary); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; transition: all 0.15s; margin-bottom: 2px;
+  }
+  .history-item:hover { background: var(--surface2); color: var(--text); }
+  .history-item.active { background: var(--accent-soft); color: var(--accent); }
+
+  .sidebar-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 16px; }
+  .sidebar-badge {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; background: var(--accent2-soft);
+    border: 1px solid rgba(0,212,255,0.15); border-radius: 10px;
+    font-size: 12px; color: var(--accent2); cursor: pointer; transition: all 0.2s;
+  }
+  .sidebar-badge:hover { background: rgba(0,212,255,0.12); border-color: rgba(0,212,255,0.25); }
+  .sidebar-badge.danger { background: var(--red-soft); border-color: rgba(239,68,68,0.2); color: var(--red); }
+  .sidebar-badge.danger:hover { background: rgba(239,68,68,0.15); }
+
+  /* ── Main ────────────────────────────────────────────────── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+  .topbar {
+    padding: 14px 28px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(10,12,21,0.85); backdrop-filter: blur(12px); z-index: 10;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 12px; }
+  .hamburger {
+    display: none; background: none; border: none; color: var(--text);
+    font-size: 20px; cursor: pointer; padding: 4px;
+  }
+  .topbar-title { font-size: 15px; font-weight: 600; }
+  .status-wrap { display: flex; align-items: center; gap: 6px; }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .status-text { font-size: 12px; color: var(--muted); }
+
+  /* ── Chat area ──────────────────────────────────────────── */
+  .chat-area { flex: 1; overflow-y: auto; padding: 28px; scroll-behavior: smooth; }
+  .chat-area::-webkit-scrollbar { width: 5px; }
+  .chat-area::-webkit-scrollbar-track { background: transparent; }
+  .chat-area::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 4px; }
+
+  /* ── Welcome ────────────────────────────────────────────── */
+  .welcome { text-align: center; padding: 50px 20px; max-width: 640px; margin: 0 auto; }
+  .welcome h1 {
+    font-size: 34px; font-weight: 700; margin-bottom: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2), #a78bfa);
+    background-size: 200% 200%;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    animation: gradientShift 4s ease infinite;
+  }
+  @keyframes gradientShift {
+    0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%}
+  }
+  .welcome p { color: var(--muted); font-size: 15px; margin-bottom: 36px; line-height: 1.7; }
+  .suggestion-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; text-align: left; }
+  .suggestion {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 18px; cursor: pointer; transition: all 0.25s; font-size: 13px;
+    position: relative; overflow: hidden;
+  }
+  .suggestion::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2)); opacity: 0;
+    transition: opacity 0.25s;
+  }
+  .suggestion:hover { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(124,92,252,0.15); }
+  .suggestion:hover::before { opacity: 1; }
+  .suggestion-icon { font-size: 22px; margin-bottom: 8px; display: block; }
+  .suggestion-title { font-weight: 600; margin-bottom: 3px; }
+  .suggestion-desc { color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+  /* ── Messages ───────────────────────────────────────────── */
+  .message { display: flex; gap: 12px; margin-bottom: 24px; animation: fadeUp 0.35s ease; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  .message.user { flex-direction: row-reverse; }
+
+  .avatar {
+    width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+  .avatar.user { background: linear-gradient(135deg, var(--accent), #5b3fd4); }
+  .avatar.ai { background: linear-gradient(135deg, #1a2240, var(--surface2)); border: 1px solid var(--border); }
+
+  .msg-content { max-width: 72%; min-width: 0; }
+  .bubble {
+    padding: 14px 18px; border-radius: 14px;
+    font-size: 14px; line-height: 1.7; word-wrap: break-word;
+  }
+  .bubble.user { background: var(--user-bubble); border: 1px solid rgba(124,92,252,0.2); border-radius: 14px 4px 14px 14px; }
+  .bubble.ai { background: var(--ai-bubble); border: 1px solid var(--border); border-radius: 4px 14px 14px 14px; }
+
+  /* Copy button */
+  .copy-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-top: 6px; padding: 4px 10px; border-radius: 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); font-size: 11px; cursor: pointer; transition: all 0.2s;
+  }
+  .copy-btn:hover { color: var(--text); border-color: var(--border-hover); }
+  .copy-btn.copied { color: var(--green); border-color: rgba(34,197,94,0.3); }
+
+  /* Markdown inside AI bubble */
+  .bubble.ai h1 { font-size: 17px; margin: 16px 0 8px; color: var(--accent); }
+  .bubble.ai h2 { font-size: 15px; margin: 14px 0 6px; color: var(--accent2); }
+  .bubble.ai h3 { font-size: 14px; margin: 12px 0 4px; color: #a78bfa; }
+  .bubble.ai p { margin: 6px 0; }
+  .bubble.ai ul, .bubble.ai ol { padding-left: 20px; margin: 6px 0; }
+  .bubble.ai li { margin-bottom: 4px; }
+  .bubble.ai table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13px; }
+  .bubble.ai th { background: rgba(124,92,252,0.15); padding: 8px 12px; text-align: left; border: 1px solid var(--border); font-weight: 600; }
+  .bubble.ai td { padding: 7px 12px; border: 1px solid var(--border); }
+  .bubble.ai tr:hover td { background: rgba(255,255,255,0.02); }
+  .bubble.ai hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+  .bubble.ai strong { color: #c4b5fd; }
+  .bubble.ai em { color: var(--text-secondary); }
+  .bubble.ai code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+  .bubble.ai pre { background: #0d1117; border-radius: 10px; padding: 14px; overflow-x: auto; margin: 10px 0; border: 1px solid var(--border); }
+  .bubble.ai blockquote { border-left: 3px solid var(--accent); padding-left: 14px; margin: 10px 0; color: var(--text-secondary); }
+  .bubble.ai a { color: var(--accent2); text-decoration: none; }
+  .bubble.ai a:hover { text-decoration: underline; }
+
+  /* ── Thinking indicator ─────────────────────────────────── */
+  .thinking { display: flex; gap: 5px; padding: 14px 18px; }
+  .thinking span { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: blink 1.2s infinite; }
+  .thinking span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:0.15} 40%{opacity:1} }
+
+  /* Agent steps */
+  .agent-steps { margin: 10px 0 0; }
+  .agent-step {
+    display: flex; align-items: center; gap: 8px; padding: 4px 0;
+    font-size: 12px; color: var(--muted); transition: all 0.3s;
+  }
+  .agent-step .step-icon { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
+  .agent-step.pending .step-icon { background: var(--surface2); color: var(--muted); }
+  .agent-step.active .step-icon { background: var(--accent-soft); color: var(--accent); animation: pulse 1s infinite; }
+  .agent-step.done .step-icon { background: var(--green-soft); color: var(--green); }
+  .agent-step.done { color: var(--green); }
+
+  /* ── Input bar ──────────────────────────────────────────── */
+  .input-bar { padding: 16px 28px 20px; border-top: 1px solid var(--border); background: var(--bg); }
+  .input-wrap {
+    display: flex; gap: 10px; align-items: flex-end;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 10px 14px; transition: all 0.25s;
+  }
+  .input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,92,252,0.1); }
+  #queryInput {
+    flex: 1; background: none; border: none; outline: none;
+    color: var(--text); font-size: 14px; font-family: inherit;
+    resize: none; max-height: 140px; min-height: 22px; line-height: 1.5;
+  }
+  #queryInput::placeholder { color: var(--muted); }
+  .send-btn {
+    width: 38px; height: 38px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), #5b3fd4);
+    border: none; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; flex-shrink: 0; transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(124,92,252,0.3);
+  }
+  .send-btn:hover { transform: scale(1.05); box-shadow: 0 4px 16px rgba(124,92,252,0.4); }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+  .send-btn svg { width: 16px; height: 16px; fill: white; }
+  .input-hint {
+    font-size: 11px; color: var(--muted); text-align: center; margin-top: 8px;
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+  }
+  .input-hint kbd {
+    display: inline-flex; align-items: center; gap: 2px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 5px; font-size: 10px; font-family: inherit;
+  }
+
+  /* ── Memory panel ───────────────────────────────────────── */
+  .memory-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99;
+    opacity: 0; pointer-events: none; transition: opacity 0.3s;
+  }
+  .memory-overlay.open { opacity: 1; pointer-events: all; }
+  .memory-panel {
+    position: fixed; right: -380px; top: 0; height: 100vh;
+    width: 360px; background: var(--surface); border-left: 1px solid var(--border);
+    transition: right 0.3s ease; z-index: 100; padding: 24px 20px; overflow-y: auto;
+    box-shadow: -8px 0 32px rgba(0,0,0,0.3);
+  }
+  .memory-panel.open { right: 0; }
+  .memory-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .memory-header h3 { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .memory-close {
+    cursor: pointer; color: var(--muted); font-size: 20px; width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center; border-radius: 8px;
+    transition: all 0.2s; background: none; border: none;
+  }
+  .memory-close:hover { background: var(--surface2); color: var(--text); }
+  .memory-item {
+    background: var(--surface2); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+    border: 1px solid var(--border); transition: border-color 0.2s;
+  }
+  .memory-item:hover { border-color: var(--border-hover); }
+  .memory-key {
+    font-size: 10px; color: var(--accent2); font-weight: 700; margin-bottom: 4px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .memory-val { font-size: 13px; color: var(--text); line-height: 1.5; }
+  .memory-empty { color: var(--muted); font-style: italic; }
+
+  /* ── Error bubble ───────────────────────────────────────── */
+  .error-bubble {
+    background: var(--red-soft); border: 1px solid rgba(239,68,68,0.3);
+    color: #fca5a5; padding: 10px 14px; border-radius: 10px; font-size: 13px;
+  }
+
+  /* ── Responsive ─────────────────────────────────────────── */
+  @media (max-width: 768px) {
+    .sidebar { position: fixed; z-index: 50; height: 100vh; transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); box-shadow: 8px 0 32px rgba(0,0,0,0.4); }
+    .hamburger { display: block; }
+    .suggestion-grid { grid-template-columns: 1fr; }
+    .msg-content { max-width: 85%; }
+    .memory-panel { width: 300px; }
+    .welcome h1 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div class="logo">
+    <div class="logo-icon">🧠</div>
+    <div>
+      <div class="logo-text">SecondBrain AI</div>
+      <div class="logo-sub">Personal Decision Assistant</div>
+    </div>
+  </div>
+
+  <button class="new-chat-btn" onclick="newChat()" id="newChatBtn">
+    <span>＋</span> New Conversation
+  </button>
+
+  <div class="sidebar-label">Recent</div>
+  <div id="historyList"></div>
+
+  <div class="sidebar-bottom">
+    <div class="sidebar-badge" onclick="toggleMemory()" id="memoryBadge">
+      <span>💾</span>
+      <span>View my memory</span>
+    </div>
+    <div class="sidebar-badge danger" onclick="clearMemory()" id="clearMemBtn">
+      <span>🗑️</span>
+      <span>Clear chat history</span>
+    </div>
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="hamburger" onclick="toggleSidebar()" id="hamburgerBtn" aria-label="Toggle sidebar">☰</button>
+      <span class="topbar-title">Chat</span>
+    </div>
+    <div class="status-wrap">
+      <span class="status-dot" id="statusDot"></span>
+      <span class="status-text" id="statusText">Ready</span>
+    </div>
+  </div>
+
+  <div class="chat-area" id="chatArea">
+    <div class="welcome" id="welcome">
+      <h1>What's on your mind?</h1>
+      <p>I'm your personal decision assistant. I remember your goals, research options, compare choices, and give you reasoned recommendations.</p>
+      <div class="suggestion-grid">
+        <div class="suggestion" onclick="suggest(this)" id="suggest-comparison">
+          <span class="suggestion-icon">💻</span>
+          <div class="suggestion-title">Product comparison</div>
+          <div class="suggestion-desc">Should I buy MacBook Air or Lenovo LOQ for AI development?</div>
+        </div>
+        <div class="suggestion" onclick="suggest(this)" id="suggest-learning">
+          <span class="suggestion-icon">🎓</span>
+          <div class="suggestion-title">Learning roadmap</div>
+          <div class="suggestion-desc">How do I become an AI engineer in 2025?</div>
+        </div>
+        <div class="suggestion" onclick="suggest(this)" id="suggest-finance">
+          <span class="suggestion-icon">💰</span>
+          <div class="suggestion-title">Financial decision</div>
+          <div class="suggestion-desc">Is it worth buying a GPU vs renting cloud compute?</div>
+        </div>
+        <div class="suggestion" onclick="suggest(this)" id="suggest-planning">
+          <span class="suggestion-icon">📅</span>
+          <div class="suggestion-title">Goal planning</div>
+          <div class="suggestion-desc">Help me plan my next 3 months for skill building</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-bar">
+    <div class="input-wrap">
+      <textarea id="queryInput" placeholder="Ask me anything — decisions, comparisons, roadmaps, goals..." rows="1"
+        onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()" aria-label="Send message">
+        <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
+      </button>
+    </div>
+    <div class="input-hint">
+      <span>SecondBrain AI · Powered by Gemini · Your data stays local</span>
+      <span><kbd>Shift</kbd>+<kbd>Enter</kbd> for newline</span>
+    </div>
+  </div>
+</main>
+
+<!-- Memory Overlay -->
+<div class="memory-overlay" id="memoryOverlay" onclick="toggleMemory()"></div>
+
+<!-- Memory Panel -->
+<div class="memory-panel" id="memoryPanel">
+  <div class="memory-header">
+    <h3>💾 Your Memory</h3>
+    <button class="memory-close" onclick="toggleMemory()" aria-label="Close memory panel">✕</button>
+  </div>
+  <div id="memoryItems"><div class="memory-empty">Loading memory...</div></div>
+</div>
+
+<script>
+const API_BASE = `http://${window.location.hostname}:8765`;
+let messages = [];
+let history = JSON.parse(localStorage.getItem('sb_history') || '[]');
+let isLoading = false;
+let rawResponses = {};  // store raw text for copy
+
+// ── Textarea auto-resize ──────────────────────────────────
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+// ── Sidebar toggle (mobile) ──────────────────────────────
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+// ── Suggestions ──────────────────────────────────────────
+function suggest(el) {
+  const desc = el.querySelector('.suggestion-desc').textContent;
+  document.getElementById('queryInput').value = desc;
+  sendMessage();
+}
+
+// ── New chat ─────────────────────────────────────────────
+function newChat() {
+  messages = [];
+  document.getElementById('chatArea').innerHTML = `
+    <div class="welcome" id="welcome">
+      <h1>What's on your mind?</h1>
+      <p>I'm your personal decision assistant. I remember your goals, research options, compare choices, and give you reasoned recommendations.</p>
+      <div class="suggestion-grid">
+        <div class="suggestion" onclick="suggest(this)"><span class="suggestion-icon">💻</span><div class="suggestion-title">Product comparison</div><div class="suggestion-desc">Should I buy MacBook Air or Lenovo LOQ for AI development?</div></div>
+        <div class="suggestion" onclick="suggest(this)"><span class="suggestion-icon">🎓</span><div class="suggestion-title">Learning roadmap</div><div class="suggestion-desc">How do I become an AI engineer in 2025?</div></div>
+        <div class="suggestion" onclick="suggest(this)"><span class="suggestion-icon">💰</span><div class="suggestion-title">Financial decision</div><div class="suggestion-desc">Is it worth buying a GPU vs renting cloud compute?</div></div>
+        <div class="suggestion" onclick="suggest(this)"><span class="suggestion-icon">📅</span><div class="suggestion-title">Goal planning</div><div class="suggestion-desc">Help me plan my next 3 months for skill building</div></div>
+      </div>
+    </div>`;
+  setStatus('Ready', 'var(--muted)', true);
+}
+
+// ── Status indicator ─────────────────────────────────────
+function setStatus(text, color='var(--muted)', isReady=true) {
+  document.getElementById('statusText').textContent = text;
+  document.getElementById('statusText').style.color = color;
+  const dot = document.getElementById('statusDot');
+  dot.style.background = isReady ? 'var(--green)' : 'var(--accent)';
+  if (!isReady) dot.style.animation = 'pulse 0.8s infinite';
+  else dot.style.animation = 'pulse 2s infinite';
+}
+
+// ── Add message to chat ──────────────────────────────────
+function addMessage(role, content, isMarkdown=false) {
+  document.getElementById('welcome')?.remove();
+  const area = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = `message ${role}`;
+  const msgId = 'msg-' + Date.now();
+
+  const avatar = document.createElement('div');
+  avatar.className = `avatar ${role}`;
+  avatar.textContent = role === 'user' ? '👤' : '🧠';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'msg-content';
+
+  const bubble = document.createElement('div');
+  bubble.className = `bubble ${role}`;
+
+  if (isMarkdown) {
+    bubble.innerHTML = marked.parse(content);
+    bubble.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+  } else {
+    bubble.textContent = content;
+  }
+
+  wrapper.appendChild(bubble);
+
+  // Add copy button for AI messages
+  if (role === 'ai') {
+    rawResponses[msgId] = content;
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'copy-btn';
+    copyBtn.id = msgId;
+    copyBtn.innerHTML = '📋 Copy';
+    copyBtn.onclick = () => copyResponse(msgId, copyBtn);
+    wrapper.appendChild(copyBtn);
+  }
+
+  div.appendChild(avatar);
+  div.appendChild(wrapper);
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+  return bubble;
+}
+
+function copyResponse(msgId, btn) {
+  const text = rawResponses[msgId] || '';
+  navigator.clipboard.writeText(text).then(() => {
+    btn.innerHTML = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.innerHTML = '📋 Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+// ── Thinking indicator with agent steps ──────────────────
+const AGENT_NAMES = [
+  { id: 'planner', label: 'Planner', desc: 'Analyzing your request...' },
+  { id: 'memory',  label: 'Memory',  desc: 'Loading your context...' },
+  { id: 'research',label: 'Research',desc: 'Gathering data & evidence...' },
+  { id: 'decision',label: 'Decision',desc: 'Weighing options...' },
+  { id: 'reflect', label: 'Reflect', desc: 'Quality check & formatting...' },
+];
+
+function addThinking() {
+  document.getElementById('welcome')?.remove();
+  const area = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = 'message ai';
+  div.id = 'thinking';
+
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar ai';
+  avatar.textContent = '🧠';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'msg-content';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble ai';
+
+  let stepsHtml = '<div class="thinking"><span></span><span></span><span></span></div>';
+  stepsHtml += '<div class="agent-steps" id="agentSteps">';
+  AGENT_NAMES.forEach((a, i) => {
+    const state = i === 0 ? 'active' : 'pending';
+    const icon = i === 0 ? '⟳' : '○';
+    stepsHtml += `<div class="agent-step ${state}" id="step-${a.id}"><div class="step-icon">${icon}</div> ${a.label} — ${a.desc}</div>`;
+  });
+  stepsHtml += '</div>';
+  bubble.innerHTML = stepsHtml;
+
+  wrapper.appendChild(bubble);
+  div.appendChild(avatar);
+  div.appendChild(wrapper);
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+}
+
+function completeStep(agentName) {
+  const stepEl = document.getElementById(`step-${agentName}`);
+  if (stepEl) {
+    stepEl.className = 'agent-step done';
+    const agent = AGENT_NAMES.find(a => a.id === agentName);
+    stepEl.innerHTML = `<div class="step-icon">✓</div> ${agent?.label || agentName} — Done`;
+  }
+  // Activate next step
+  const idx = AGENT_NAMES.findIndex(a => a.id === agentName);
+  if (idx >= 0 && idx < AGENT_NAMES.length - 1) {
+    const next = AGENT_NAMES[idx + 1];
+    const nextEl = document.getElementById(`step-${next.id}`);
+    if (nextEl) {
+      nextEl.className = 'agent-step active';
+      nextEl.innerHTML = `<div class="step-icon">⟳</div> ${next.label} — ${next.desc}`;
+    }
+  }
+}
+
+function removeThinking() {
+  document.getElementById('thinking')?.remove();
+}
+
+// ── Send message ─────────────────────────────────────────
+async function sendMessage() {
+  const input = document.getElementById('queryInput');
+  const query = input.value.trim();
+  if (!query || isLoading) return;
+
+  isLoading = true;
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('sendBtn').disabled = true;
+  setStatus('Thinking...', 'var(--accent)', false);
+
+  addMessage('user', query);
+  addThinking();
+
+  // Close sidebar on mobile after sending
+  document.getElementById('sidebar').classList.remove('open');
+
+  try {
+    const res = await fetch(`${API_BASE}/ask`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({query})
+    });
+
+    const data = await res.json();
+
+    // Mark agent steps complete based on returned events
+    if (data.events && Array.isArray(data.events)) {
+      const agentMap = {
+        'planner_agent': 'planner',
+        'memory_agent': 'memory',
+        'research_agent': 'research',
+        'decision_agent': 'decision',
+        'reflection_agent': 'reflect',
+      };
+      const completedAgents = new Set();
+      for (const ev of data.events) {
+        const mapped = agentMap[ev.author];
+        if (mapped && !completedAgents.has(mapped)) {
+          completedAgents.add(mapped);
+          completeStep(mapped);
+          await new Promise(r => setTimeout(r, 200)); // visual delay
+        }
+      }
+    }
+
+    // Brief pause so user sees all steps complete
+    await new Promise(r => setTimeout(r, 400));
+    removeThinking();
+
+    if (data.error) {
+      addMessage('ai', `❌ **Error:** ${data.error}`, true);
+      setStatus('Error', 'var(--red)', true);
+    } else {
+      const answer = data.final_answer || data.response || JSON.stringify(data);
+      addMessage('ai', answer, true);
+
+      // Save to history
+      history.unshift({query, time: new Date().toLocaleDateString()});
+      history = history.slice(0, 15);
+      localStorage.setItem('sb_history', JSON.stringify(history));
+      renderHistory();
+      setStatus('Ready', 'var(--muted)', true);
+    }
+  } catch (err) {
+    removeThinking();
+    addMessage('ai',
+      `⚠️ **Could not connect to the agent backend.**\n\nMake sure the server is running:\n\`\`\`bash\nuv run python server.py\n\`\`\`\n\nThen open **http://localhost:8765** in your browser.\n\nError: \`${err.message}\``,
+      true
+    );
+    setStatus('Offline', 'var(--red)', true);
+  }
+
+  isLoading = false;
+  document.getElementById('sendBtn').disabled = false;
+  document.getElementById('queryInput').focus();
+}
+
+// ── History ──────────────────────────────────────────────
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  list.innerHTML = history.map((h,i) =>
+    `<div class="history-item ${i===0?'active':''}" title="${h.query}" onclick="replayHistory('${h.query.replace(/'/g,"\\'")}')">
+      ${h.query}
+    </div>`
+  ).join('');
+}
+
+function replayHistory(query) {
+  document.getElementById('queryInput').value = query;
+  sendMessage();
+}
+
+function clearMemory() {
+  if (confirm('Clear all chat history?')) {
+    history = [];
+    localStorage.removeItem('sb_history');
+    renderHistory();
+  }
+}
+
+// ── Memory panel ─────────────────────────────────────────
+function toggleMemory() {
+  const panel = document.getElementById('memoryPanel');
+  const overlay = document.getElementById('memoryOverlay');
+  panel.classList.toggle('open');
+  overlay.classList.toggle('open');
+  if (panel.classList.contains('open')) loadMemory();
+}
+
+async function loadMemory() {
+  const el = document.getElementById('memoryItems');
+  try {
+    const res = await fetch(`${API_BASE}/memory`);
+    const data = await res.json();
+    const keys = ['career_goals','budget','preferences','decisions','notes'];
+    el.innerHTML = keys.map(k => `
+      <div class="memory-item">
+        <div class="memory-key">${k.replace(/_/g,' ')}</div>
+        <div class="memory-val">${data[k] || '<span class="memory-empty">not set</span>'}</div>
+      </div>`).join('');
+  } catch {
+    el.innerHTML = `<div class="memory-empty">
+      Start the server to view your memory.<br><br>
+      <code style="font-size:12px;color:var(--accent)">uv run python server.py</code>
+    </div>`;
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────
+renderHistory();
+document.getElementById('queryInput').focus();
+</script>
+</body>
+</html>

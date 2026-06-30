@@ -49,6 +49,23 @@ class GuardrailsPlugin(BasePlugin):
             if pattern.search(text_content):
                 print(f"[!] Guardrails Triggered: Prompt injection attempt detected in message: '{text_content}'")
                 raise SecurityViolation("Access Denied: Prompt injection attempt detected.")
+                
+        # Dynamically load matching skills based on keywords
+        from skills import match_and_load_skills
+        matched_skills = match_and_load_skills(text_content)
+        if matched_skills:
+            print(f"[Guardrails] Injecting skills: {[s.name for s in matched_skills]}")
+            skill_instructions = "\n\n".join([
+                f"--- Active Domain Skill: {s.name} ---\n{s.instructions}"
+                for s in matched_skills
+            ])
+        else:
+            skill_instructions = "No specific domain skills active."
+            
+        # Store instructions in session state for prompt template formatting
+        if hasattr(invocation_context, "session") and invocation_context.session:
+            invocation_context.session.state["skill_instructions"] = skill_instructions
+            
         return None
 
     async def before_tool_callback(

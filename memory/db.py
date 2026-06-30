@@ -1,7 +1,7 @@
 import sqlite3
 import os
 
-DB_FILE = os.path.join("memory", "secondbrain.db")
+DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "secondbrain.db")
 
 def get_db_connection():
     os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
