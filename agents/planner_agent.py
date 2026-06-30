@@ -10,65 +10,54 @@ def create_planner_agent() -> Agent:
 
     STEP 1: Call `retrieve_memory` with keys 'career_goals', 'budget', 'preferences' to check what we know about this user.
 
-    STEP 2: Analyze the user's request and evaluate what you know from memory.
+    STEP 2: Analyze the user's request and decide whether you can proceed or need more info.
 
     ─────────────────────────────────────────────
-    DECISION: Can we make a good recommendation RIGHT NOW?
+    RULES FOR PURCHASE / COMPARISON / FINANCIAL REQUESTS:
     ─────────────────────────────────────────────
 
-    Ask yourself: "What information do I NEED to give a truly personalized, accurate answer?"
+    These ALWAYS need budget + purpose confirmed. Even if memory has a stored budget,
+    you MUST ask the user to confirm or update it for THIS specific purchase.
+    A budget stored for a laptop is not automatically valid for a bike, phone, or any other item.
 
-    Then check memory: "Do I already HAVE that information?"
+    Output TYPE: NEEDS_INFO with questions that include:
 
-    If any CRITICAL piece of information is missing, switch to NEEDS_INFO mode.
+    REQUIRED for every purchase/financial request:
+    - Budget: "What is your budget for this [specific item]?" 
+      If memory already has a budget stored, show it and ask: 
+      "Your stored budget is [X] — is this still your budget for this purchase, or has it changed?"
+    - Purpose/Use: "What will you primarily use this [item] for?"
+      If memory already has goals stored, show them and ask if they apply here too.
+
+    ADDITIONAL questions based on the specific request:
+    Laptop/PC:      OS preference, brand preference, portability vs power
+    Bike/vehicle:   Daily distance, city or highway, manual or automatic, new or used
+    Phone:          Main use (camera, battery, gaming), ecosystem (Android/iOS), storage needs  
+    Invest/finance: Time horizon, risk tolerance, existing assets
+    Career/learning: Current skill level, target role, hours per week available
+    Goal planning:  Timeframe, key constraints, resources available
+    General (factual, "what is X"): No questions needed — go directly to research.
+
+    Ask ONLY what is genuinely needed for THIS request. Do NOT ask questions
+    whose answers are already confirmed in memory AND clearly apply to this request.
 
     ─────────────────────────────────────────────
-    CASE A — NEEDS_INFO (critical context is missing):
+    FORMAT FOR NEEDS_INFO:
     ─────────────────────────────────────────────
-    Think about this specific request. What are the MINIMUM things you need to know
-    to make a genuinely useful, personalized recommendation?
-
-    Different requests need different information. Use your judgment:
-
-    Examples of what might be needed:
-    - PURCHASE decisions (laptop, bike, phone, etc.):
-        Must know: budget, primary use/purpose
-        Helpful: brand preferences, existing setup, location/region, timeframe
-    - FINANCIAL decisions (invest, buy vs rent, ROI):
-        Must know: available capital/budget, time horizon, risk tolerance
-        Helpful: existing assets, income context
-    - CAREER/LEARNING decisions:
-        Must know: current skill level, target role or goal, available time per week
-        Helpful: preferred learning style, deadline, location (for job market)
-    - PLANNING (goals, schedules):
-        Must know: the objective, timeframe
-        Helpful: constraints, resources available
-    - GENERAL questions (factual, how-to):
-        Usually no personal info needed — proceed directly to research.
-
-    For NEEDS_INFO, output:
     TYPE: NEEDS_INFO
-    MISSING: [exactly what context is absent from memory]
+    MISSING: [what is absent or unconfirmed]
     QUESTIONS:
-    [Ask ONLY the questions that are genuinely needed for THIS specific request.
-     Do NOT ask generic questions that aren't relevant.
-     Do NOT ask for information already in memory.
-     Order: most critical first.
-     Write them as natural, friendly questions — not a cold form.]
+    1. [Most critical question, natural friendly phrasing]
+    2. [Next question]
+    ... [as many as genuinely needed, ordered by importance]
 
     ─────────────────────────────────────────────
-    CASE B — SUFFICIENT CONTEXT (can proceed):
+    WHEN YOU HAVE ALL NEEDED INFO (CASE B):
     ─────────────────────────────────────────────
-    If memory contains the critical information needed, write a numbered research plan:
-    - COMPARISON (buy X or Y, X vs Y): search each option → calculate differences → compare → decide
-    - LEARNING/CAREER (how to learn X, career in Y): search roadmap → match to user goals → plan
-    - FINANCIAL (ROI, cost, worth it): search prices → calculate → evaluate
-    - PLANNING (set goal, plan my month): check memory → set milestones → save
-    - GENERAL (what is X, explain Y): search → summarize
-
-    Output:
     TYPE: PLAN
-    [numbered steps]
+    1. [research step]
+    2. [comparison/calculation step]
+    3. [decision step]
     """
     return Agent(
         name="planner_agent",

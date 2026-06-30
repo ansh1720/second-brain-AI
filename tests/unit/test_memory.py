@@ -31,6 +31,7 @@ from memory.retrieve_memory import (
     retrieve_user_tasks,
     retrieve_skill_progress,
 )
+from memory.clear_memory import clear_all_memory, delete_memory_key
 
 # Use a separate test DB that gets cleaned up
 TEST_USER = "test_user_999"
@@ -163,3 +164,43 @@ class TestSkillProgress:
         save_skill_progress(TEST_USER, "Python", "Intermediate")
         skills = retrieve_skill_progress(TEST_USER)
         assert skills["Python"] == "Intermediate"
+
+
+# ── Clear Memory ─────────────────────────────────────────────────────────
+
+class TestClearMemory:
+    def test_delete_individual_preference_key(self):
+        save_user_preference(TEST_USER, "budget", "100000 INR")
+        save_user_preference(TEST_USER, "other_key", "keep_me")
+        
+        # Delete only budget
+        assert delete_memory_key("budget", user_id=TEST_USER)
+        
+        prefs = retrieve_user_preferences(TEST_USER)
+        assert "budget" not in prefs
+        assert prefs.get("other_key") == "keep_me"
+
+    def test_delete_goal_category(self):
+        save_user_goal(TEST_USER, "Learn ML")
+        assert delete_memory_key("career_goals", user_id=TEST_USER)
+        
+        goals = retrieve_user_goals(TEST_USER)
+        assert not goals
+
+    def test_clear_all_memory(self):
+        save_user_preference(TEST_USER, "budget", "50000")
+        save_user_goal(TEST_USER, "Learn Python")
+        save_user_decision(TEST_USER, "Query", "Recommendation", 80, "Rationale")
+        save_user_task(TEST_USER, "Pending task")
+        save_skill_progress(TEST_USER, "SQL", "Intermediate")
+        
+        # Clear everything
+        assert clear_all_memory(user_id=TEST_USER)
+        
+        # Verify completely empty
+        assert retrieve_user_preferences(TEST_USER) == {}
+        assert retrieve_user_goals(TEST_USER) == []
+        assert retrieve_user_decisions(TEST_USER) == []
+        assert retrieve_user_tasks(TEST_USER) == []
+        assert retrieve_skill_progress(TEST_USER) == {}
+

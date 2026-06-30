@@ -115,7 +115,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
@@ -156,6 +156,31 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 print(f"[!] Error: {e}")
                 self.send_json({"error": str(e)}, 500)
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_DELETE(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        if path == "/memory":
+            from urllib.parse import parse_qs
+            query = parse_qs(parsed.query)
+            key = query.get("key", [None])[0]
+
+            from memory.clear_memory import clear_all_memory, delete_memory_key
+            if key:
+                success = delete_memory_key(key)
+                action = f"delete key '{key}'"
+            else:
+                success = clear_all_memory()
+                action = "clear all memory"
+
+            if success:
+                self.send_json({"success": True, "message": f"Successfully performed: {action}"})
+            else:
+                self.send_json({"error": f"Failed to perform: {action}"}, 500)
         else:
             self.send_response(404)
             self.end_headers()

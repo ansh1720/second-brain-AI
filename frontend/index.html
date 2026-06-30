@@ -400,6 +400,12 @@
     <button class="memory-close" onclick="toggleMemory()" aria-label="Close memory panel">✕</button>
   </div>
   <div id="memoryItems"><div class="memory-empty">Loading memory...</div></div>
+  <div style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px;">
+    <button class="sidebar-badge danger" onclick="clearAgentMemory()" style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 8px;">
+      <span>🗑️</span>
+      <span>Clear all agent memory</span>
+    </button>
+  </div>
 </div>
 
 <script>
@@ -697,7 +703,10 @@ async function loadMemory() {
     const keys = ['career_goals','budget','preferences','decisions','notes'];
     el.innerHTML = keys.map(k => `
       <div class="memory-item">
-        <div class="memory-key">${k.replace(/_/g,' ')}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <div class="memory-key">${k.replace(/_/g,' ')}</div>
+          ${data[k] ? `<button onclick="deleteMemoryKey('${k}')" style="background:none; border:none; color:var(--red); font-size:10px; cursor:pointer; padding:2px 4px; border-radius:4px;" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='none'">✕ Delete</button>` : ''}
+        </div>
         <div class="memory-val">${data[k] || '<span class="memory-empty">not set</span>'}</div>
       </div>`).join('');
   } catch {
@@ -705,6 +714,39 @@ async function loadMemory() {
       Start the server to view your memory.<br><br>
       <code style="font-size:12px;color:var(--accent)">uv run python server.py</code>
     </div>`;
+  }
+}
+
+async function deleteMemoryKey(key) {
+  if (confirm(`Erase stored memory for "${key.replace(/_/g, ' ')}"?`)) {
+    try {
+      const res = await fetch(`${API_BASE}/memory?key=${key}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        loadMemory();
+      } else {
+        alert('Failed to delete memory: ' + (data.error || 'unknown error'));
+      }
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
+  }
+}
+
+async function clearAgentMemory() {
+  if (confirm('Erase ALL persistent agent memory (budget, goals, preferences, decisions, etc.)? This cannot be undone.')) {
+    try {
+      const res = await fetch(`${API_BASE}/memory`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        loadMemory();
+        alert('All agent memory cleared.');
+      } else {
+        alert('Failed to clear memory: ' + (data.error || 'unknown error'));
+      }
+    } catch (err) {
+      alert('Error: ' + err.message);
+    }
   }
 }
 

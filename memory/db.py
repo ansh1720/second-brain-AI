@@ -74,17 +74,10 @@ def init_db():
     )
     """)
     
-    # Insert default user if not exists
+    # Insert default user if not exists — NO preset preferences or goals.
+    # Memory starts empty so the agent will ask the user for their context.
     cursor.execute("INSERT OR IGNORE INTO users (id, name) VALUES ('user_123', 'Default User')")
-    
-    # Insert default user preferences and goals for test verification
-    cursor.execute("INSERT OR IGNORE INTO preferences (user_id, pref_key, pref_value) VALUES ('user_123', 'budget', '75000 INR')")
-    cursor.execute("INSERT OR IGNORE INTO preferences (user_id, pref_key, pref_value) VALUES ('user_123', 'preferred_brands', 'Apple, Lenovo')")
-    
-    # Check if goals already exist to prevent duplicates
-    cursor.execute("SELECT count(*) FROM goals WHERE user_id = 'user_123'")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO goals (user_id, goal_text, target_date) VALUES ('user_123', 'Build local AI/ML models and learn CUDA development', '2026-12-31')")
     
     conn.commit()
     conn.close()
+
