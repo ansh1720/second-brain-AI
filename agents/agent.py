@@ -9,8 +9,8 @@ def create_orchestrator_agent() -> SequentialAgent:
     return SequentialAgent(
         name="orchestrator_agent",
         sub_agents=[
-            create_planner_agent(),
             create_memory_agent(),
+            create_planner_agent(),
             create_research_agent(),
             create_decision_agent(),
             create_reflection_agent(),

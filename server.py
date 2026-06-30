@@ -36,7 +36,10 @@ FRONTEND_DIR = Path(__file__).parent / "frontend"
 init_db()
 
 
-def run_agent(query: str) -> dict:
+SESSION_SERVICE = InMemorySessionService()
+
+
+def run_agent(query: str, session_id: str, history_data: list = None) -> dict:
     """Run the full multi-agent pipeline and return results."""
 
     async def _run():
@@ -46,21 +49,41 @@ def run_agent(query: str) -> dict:
             if matched_skills else "No specific domain skills active."
         )
 
-        session_service = InMemorySessionService()
-        session = await session_service.create_session(
-            app_name="agents",
-            user_id="user_123",
-            session_id="web_session",
-            state={"skill_instructions": skill_instructions}
-        )
+        app = App(name="app", root_agent=root_agent, plugins=[GuardrailsPlugin()])
+        runner = Runner(app=app, session_service=SESSION_SERVICE)
 
-        app = App(name="agents", root_agent=root_agent, plugins=[GuardrailsPlugin()])
-        runner = Runner(app=app, session_service=session_service)
+        # Retrieve or create session
+        try:
+            session = await SESSION_SERVICE.get_session(
+                app_name="app",
+                user_id="user_123",
+                session_id=session_id
+            )
+            session.state["skill_instructions"] = skill_instructions
+        except Exception:
+            session = await SESSION_SERVICE.create_session(
+                app_name="app",
+                user_id="user_123",
+                session_id=session_id,
+                state={"skill_instructions": skill_instructions}
+            )
+
+        # Sync conversation history from client if new session or session restarted
+        if history_data and not session.messages:
+            session.messages = []
+            for msg in history_data:
+                role = msg.get("role")
+                content = msg.get("content")
+                if role and content:
+                    adk_role = "user" if role == "user" else "model"
+                    session.messages.append(
+                        types.Content(role=adk_role, parts=[types.Part.from_text(text=content)])
+                    )
 
         events = []
         async for event in runner.run_async(
             user_id="user_123",
-            session_id="web_session",
+            session_id=session_id,
             new_message=types.Content(role="user", parts=[types.Part.from_text(text=query)])
         ):
             if event.content and event.content.parts:
@@ -68,8 +91,9 @@ def run_agent(query: str) -> dict:
                     if part.text:
                         events.append({"author": event.author, "text": part.text})
 
-        session = await session_service.get_session(
-            app_name="agents", user_id="user_123", session_id="web_session"
+        # Get updated session
+        session = await SESSION_SERVICE.get_session(
+            app_name="app", user_id="user_123", session_id=session_id
         )
 
         final = session.state.get("final_answer") or (events[-1]["text"] if events else "No response generated.")
@@ -137,6 +161,8 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length))
             query = body.get("query", "").strip()
+            session_id = body.get("session_id", "web_session")
+            history_data = body.get("history", [])
 
             if not query:
                 self.send_json({"error": "Query is empty"}, 400)
@@ -147,9 +173,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": "GEMINI_API_KEY not set in .env file"}, 500)
                 return
 
-            print(f"\n[+] Query: {query}")
+            print(f"\n[+] Query: {query} (Session: {session_id})")
             try:
-                result = run_agent(query)
+                result = run_agent(query, session_id, history_data)
                 self.send_json(result)
             except SecurityViolation as e:
                 self.send_json({"error": f"Blocked by guardrails: {e}"}, 403)

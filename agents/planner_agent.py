@@ -7,8 +7,9 @@ def create_planner_agent() -> Agent:
     NEVER answer the user's question directly. Your only job is to plan.
 
     Active Skills Guidance: {skill_instructions?}
+    User Memory: {user_memory?}
 
-    STEP 1: Call `retrieve_memory` with keys 'career_goals', 'budget', 'preferences' to check what we know about this user.
+    STEP 1: Check the User Memory details provided in the context above.
 
     STEP 2: Analyze the user's request and decide whether you can proceed or need more info.
 
@@ -63,6 +64,5 @@ def create_planner_agent() -> Agent:
         name="planner_agent",
         model="gemini-3.1-flash-lite",
         instruction=instruction,
-        tools=get_mcp_tools(),
         output_key="plan"
     )

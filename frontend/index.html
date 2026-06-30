@@ -379,41 +379,19 @@
     <div class="input-wrap">
       <textarea id="queryInput" placeholder="Ask me anything — decisions, comparisons, roadmaps, goals..." rows="1"
         onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
-      <button class="send-btn" id="sendBtn" onclick="sendMessage()" aria-label="Send message">
-        <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
-      </button>
-    </div>
-    <div class="input-hint">
-      <span>SecondBrain AI · Powered by Gemini · Your data stays local</span>
-      <span><kbd>Shift</kbd>+<kbd>Enter</kbd> for newline</span>
-    </div>
-  </div>
-</main>
-
-<!-- Memory Overlay -->
-<div class="memory-overlay" id="memoryOverlay" onclick="toggleMemory()"></div>
-
-<!-- Memory Panel -->
-<div class="memory-panel" id="memoryPanel">
-  <div class="memory-header">
-    <h3>💾 Your Memory</h3>
-    <button class="memory-close" onclick="toggleMemory()" aria-label="Close memory panel">✕</button>
-  </div>
-  <div id="memoryItems"><div class="memory-empty">Loading memory...</div></div>
-  <div style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px;">
-    <button class="sidebar-badge danger" onclick="clearAgentMemory()" style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 8px;">
-      <span>🗑️</span>
-      <span>Clear all agent memory</span>
-    </button>
-  </div>
-</div>
-
 <script>
 const API_BASE = `http://${window.location.hostname}:8765`;
 let messages = [];
-let history = JSON.parse(localStorage.getItem('sb_history') || '[]');
+let sessions = JSON.parse(localStorage.getItem('sb_sessions') || '[]');
+let currentSessionId = localStorage.getItem('sb_current_session_id');
 let isLoading = false;
 let rawResponses = {};  // store raw text for copy
+
+function initNewSession() {
+  currentSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  localStorage.setItem('sb_current_session_id', currentSessionId);
+  messages = [];
+}
 
 // ── Textarea auto-resize ──────────────────────────────────
 function autoResize(el) {
@@ -439,8 +417,9 @@ function suggest(el) {
 
 // ── New chat ─────────────────────────────────────────────
 function newChat() {
-  messages = [];
-  document.getElementById('chatArea').innerHTML = `
+  initNewSession();
+  const area = document.getElementById('chatArea');
+  area.innerHTML = `
     <div class="welcome" id="welcome">
       <h1>What's on your mind?</h1>
       <p>I'm your personal decision assistant. I remember your goals, research options, compare choices, and give you reasoned recommendations.</p>
@@ -451,6 +430,7 @@ function newChat() {
         <div class="suggestion" onclick="suggest(this)"><span class="suggestion-icon">📅</span><div class="suggestion-title">Goal planning</div><div class="suggestion-desc">Help me plan my next 3 months for skill building</div></div>
       </div>
     </div>`;
+  renderHistory();
   setStatus('Ready', 'var(--muted)', true);
 }
 
@@ -470,7 +450,7 @@ function addMessage(role, content, isMarkdown=false) {
   const area = document.getElementById('chatArea');
   const div = document.createElement('div');
   div.className = `message ${role}`;
-  const msgId = 'msg-' + Date.now();
+  const msgId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
 
   const avatar = document.createElement('div');
   avatar.className = `avatar ${role}`;
@@ -520,8 +500,8 @@ function copyResponse(msgId, btn) {
 
 // ── Thinking indicator with agent steps ──────────────────
 const AGENT_NAMES = [
-  { id: 'planner', label: 'Planner', desc: 'Analyzing your request...' },
   { id: 'memory',  label: 'Memory',  desc: 'Loading your context...' },
+  { id: 'planner', label: 'Planner', desc: 'Analyzing your request...' },
   { id: 'research',label: 'Research',desc: 'Gathering data & evidence...' },
   { id: 'decision',label: 'Decision',desc: 'Weighing options...' },
   { id: 'reflect', label: 'Reflect', desc: 'Quality check & formatting...' },
@@ -599,14 +579,37 @@ async function sendMessage() {
   addMessage('user', query);
   addThinking();
 
+  // Save user message to locally preserved message history
+  messages.push({ role: 'user', content: query });
+  
+  // Track/save session title if new session
+  let session = sessions.find(s => s.id === currentSessionId);
+  if (!session) {
+    session = { id: currentSessionId, title: query, time: new Date().toLocaleDateString() };
+    sessions.unshift(session);
+    localStorage.setItem('sb_sessions', JSON.stringify(sessions));
+  }
+  localStorage.setItem(`sb_messages_${currentSessionId}`, JSON.stringify(messages));
+  renderHistory();
+
   // Close sidebar on mobile after sending
   document.getElementById('sidebar').classList.remove('open');
 
   try {
+    // Generate history payload for the runner
+    const historyPayload = messages.slice(0, -1).map(m => ({
+      role: m.role === 'user' ? 'user' : 'model',
+      content: m.content
+    }));
+
     const res = await fetch(`${API_BASE}/ask`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({query})
+      body: JSON.stringify({
+        query,
+        session_id: currentSessionId,
+        history: historyPayload
+      })
     });
 
     const data = await res.json();
@@ -614,8 +617,8 @@ async function sendMessage() {
     // Mark agent steps complete based on returned events
     if (data.events && Array.isArray(data.events)) {
       const agentMap = {
-        'planner_agent': 'planner',
         'memory_agent': 'memory',
+        'planner_agent': 'planner',
         'research_agent': 'research',
         'decision_agent': 'decision',
         'reflection_agent': 'reflect',
@@ -637,16 +640,14 @@ async function sendMessage() {
 
     if (data.error) {
       addMessage('ai', `❌ **Error:** ${data.error}`, true);
+      messages.push({ role: 'ai', content: `❌ **Error:** ${data.error}` });
+      localStorage.setItem(`sb_messages_${currentSessionId}`, JSON.stringify(messages));
       setStatus('Error', 'var(--red)', true);
     } else {
       const answer = data.final_answer || data.response || JSON.stringify(data);
       addMessage('ai', answer, true);
-
-      // Save to history
-      history.unshift({query, time: new Date().toLocaleDateString()});
-      history = history.slice(0, 15);
-      localStorage.setItem('sb_history', JSON.stringify(history));
-      renderHistory();
+      messages.push({ role: 'ai', content: answer });
+      localStorage.setItem(`sb_messages_${currentSessionId}`, JSON.stringify(messages));
       setStatus('Ready', 'var(--muted)', true);
     }
   } catch (err) {
@@ -663,26 +664,49 @@ async function sendMessage() {
   document.getElementById('queryInput').focus();
 }
 
-// ── History ──────────────────────────────────────────────
+// ── History / Sessions ───────────────────────────────────
 function renderHistory() {
   const list = document.getElementById('historyList');
-  list.innerHTML = history.map((h,i) =>
-    `<div class="history-item ${i===0?'active':''}" title="${h.query}" onclick="replayHistory('${h.query.replace(/'/g,"\\'")}')">
-      ${h.query}
+  if (sessions.length === 0) {
+    list.innerHTML = `<div style="color:var(--muted);font-size:12px;padding:8px 12px;font-style:italic">No recent chats</div>`;
+    return;
+  }
+  list.innerHTML = sessions.map(s =>
+    `<div class="history-item ${s.id === currentSessionId ? 'active' : ''}" title="${s.title}" onclick="loadSession('${s.id}')">
+      ${s.title}
     </div>`
   ).join('');
 }
 
-function replayHistory(query) {
-  document.getElementById('queryInput').value = query;
-  sendMessage();
+function loadSession(sessionId) {
+  currentSessionId = sessionId;
+  localStorage.setItem('sb_current_session_id', currentSessionId);
+  messages = JSON.parse(localStorage.getItem(`sb_messages_${sessionId}`) || '[]');
+  
+  const area = document.getElementById('chatArea');
+  area.innerHTML = '';
+  
+  if (messages.length === 0) {
+    newChat();
+  } else {
+    messages.forEach(m => {
+      addMessage(m.role, m.content, m.role === 'ai');
+    });
+  }
+  renderHistory();
+  document.getElementById('sidebar').classList.remove('open');
 }
 
 function clearMemory() {
-  if (confirm('Clear all chat history?')) {
-    history = [];
-    localStorage.removeItem('sb_history');
-    renderHistory();
+  if (confirm('Clear all chat sessions? This will delete all history on your device.')) {
+    sessions.forEach(s => {
+      localStorage.removeItem(`sb_messages_${s.id}`);
+    });
+    sessions = [];
+    localStorage.removeItem('sb_sessions');
+    localStorage.removeItem('sb_current_session_id');
+    initNewSession();
+    newChat();
   }
 }
 
@@ -751,7 +775,11 @@ async function clearAgentMemory() {
 }
 
 // ── Init ─────────────────────────────────────────────────
-renderHistory();
+if (currentSessionId && sessions.some(s => s.id === currentSessionId)) {
+  loadSession(currentSessionId);
+} else {
+  newChat();
+}
 document.getElementById('queryInput').focus();
 </script>
 </body>
